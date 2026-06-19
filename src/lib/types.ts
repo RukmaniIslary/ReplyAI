@@ -3,8 +3,8 @@ export type Profile = {
   email: string
   full_name: string | null
   plan: 'free' | 'starter' | 'growth' | 'pro'
-  stripe_customer_id: string | null
-  stripe_subscription_id: string | null
+  paddle_customer_id: string | null
+  paddle_subscription_id: string | null
   subscription_status: string | null
   conversations_used: number
   conversations_limit: number

@@ -1,0 +1,87 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --brand-lime: #a3e635;
+  --brand-lime-dark: #84cc16;
+  --brand-lime-light: #d9f99d;
+  --brand-white: #ffffff;
+  --brand-dark: #0a0a0a;
+  --brand-gray: #171717;
+  --brand-gray-light: #262626;
+}
+
+@layer base {
+  * {
+    @apply border-neutral-800;
+  }
+
+  body {
+    @apply bg-black text-white antialiased;
+    font-family: var(--font-geist-sans), system-ui, sans-serif;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-semibold tracking-tight;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg bg-lime-400 px-6 py-3 text-sm font-semibold text-black transition-all hover:bg-lime-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lime-400 focus-visible:ring-offset-2 focus-visible:ring-offset-black disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg border border-neutral-700 bg-neutral-900 px-6 py-3 text-sm font-semibold text-white transition-all hover:border-lime-400 hover:text-lime-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lime-400 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-neutral-400 transition-all hover:text-white focus-visible:outline-none;
+  }
+
+  .card {
+    @apply rounded-xl border border-neutral-800 bg-neutral-950 p-6;
+  }
+
+  .input {
+    @apply w-full rounded-lg border border-neutral-700 bg-neutral-900 px-4 py-3 text-sm text-white placeholder:text-neutral-500 transition-colors focus:border-lime-400 focus:outline-none focus:ring-1 focus:ring-lime-400;
+  }
+
+  .label {
+    @apply block text-sm font-medium text-neutral-300 mb-1.5;
+  }
+
+  .badge-lime {
+    @apply inline-flex items-center rounded-full bg-lime-400/10 px-2.5 py-0.5 text-xs font-medium text-lime-400;
+  }
+
+  .badge-green {
+    @apply inline-flex items-center rounded-full bg-green-500/10 px-2.5 py-0.5 text-xs font-medium text-green-400;
+  }
+
+  .badge-red {
+    @apply inline-flex items-center rounded-full bg-red-500/10 px-2.5 py-0.5 text-xs font-medium text-red-400;
+  }
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #0a0a0a;
+}
+::-webkit-scrollbar-thumb {
+  background: #404040;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #a3e635;
+}
+
+/* Widget iframe reset */
+#raysef-widget-root * {
+  box-sizing: border-box;
+  font-family: system-ui, sans-serif;
+}

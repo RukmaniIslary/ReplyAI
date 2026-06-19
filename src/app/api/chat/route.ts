@@ -77,8 +77,10 @@ export async function POST(req: NextRequest) {
       content: message,
     })
 
-    // Vector similarity search for context
-    const genAI = new GoogleGenerativeAI(process.env.OPENAI_API_KEY!)
+    // Initialize Gemini
+    const apiKey = process.env.OPENAI_API_KEY || process.env.GEMINI_API_KEY
+    if (!apiKey) return NextResponse.json({ error: 'AI API key not configured.' }, { status: 500 })
+    const genAI = new GoogleGenerativeAI(apiKey)
     const embeddingModel = genAI.getGenerativeModel({ model: 'text-embedding-004' })
     const embeddingResult = await embeddingModel.embedContent(message)
     const embedding = embeddingResult.embedding.values

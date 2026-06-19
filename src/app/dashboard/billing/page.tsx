@@ -12,7 +12,7 @@ export default async function BillingPage() {
         <h1 className="text-2xl font-bold text-white">Billing</h1>
         <p className="mt-1 text-sm text-neutral-400">Manage your subscription and payment method.</p>
       </div>
-      <BillingClient profile={profile} />
+      <BillingClient profile={profile} userEmail={user!.email} />
     </div>
   )
 }

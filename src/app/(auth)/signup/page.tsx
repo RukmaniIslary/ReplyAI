@@ -19,7 +19,6 @@ export default function SignupPage() {
     setLoading(true)
     setError('')
 
-    // Layer 02: Disposable email check (client-side fast fail)
     if (isDisposableEmail(email)) {
       setError('Please use a valid business email address.')
       setLoading(false)
@@ -27,25 +26,30 @@ export default function SignupPage() {
     }
 
     const supabase = createClient()
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
-    const { error } = await supabase.auth.signUp({
+    const { data, error: signUpError } = await supabase.auth.signUp({
       email,
       password,
       options: {
         data: { full_name: name },
-        emailRedirectTo: `${appUrl}/auth/confirm?next=/dashboard/billing/checkout?plan=starter`,
+        emailRedirectTo: `${window.location.origin}/auth/confirm`,
       },
     })
 
-    if (error) {
-      setError(error.message)
+    if (signUpError) {
+      setError(signUpError.message)
       setLoading(false)
-    } else {
-      // Show check email message
-      setError('')
-      setLoading(false)
-      router.push('/auth/check-email')
+      return
     }
+
+    // If email confirmation is disabled in Supabase, session is created immediately
+    if (data.session) {
+      router.push('/dashboard')
+      router.refresh()
+      return
+    }
+
+    // If email confirmation is enabled, show check-email page
+    router.push('/auth/check-email')
   }
 
   return (
@@ -56,7 +60,7 @@ export default function SignupPage() {
             Ray<span className="text-lime-400">sef</span>
           </Link>
           <h1 className="mt-6 text-2xl font-semibold text-white">Start your free trial</h1>
-          <p className="mt-1 text-sm text-neutral-400">14 days free. Card required. Cancel anytime.</p>
+          <p className="mt-1 text-sm text-neutral-400">14 days free. No charge until day 15.</p>
         </div>
 
         <form onSubmit={handleSignup} className="space-y-4">
@@ -68,45 +72,17 @@ export default function SignupPage() {
 
           <div>
             <label className="label" htmlFor="name">Full name</label>
-            <input
-              id="name"
-              type="text"
-              className="input"
-              placeholder="Jane Smith"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-              autoComplete="name"
-            />
+            <input id="name" type="text" className="input" placeholder="Jane Smith" value={name} onChange={(e) => setName(e.target.value)} required autoComplete="name" />
           </div>
 
           <div>
-            <label className="label" htmlFor="email">Work email</label>
-            <input
-              id="email"
-              type="email"
-              className="input"
-              placeholder="you@company.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              autoComplete="email"
-            />
+            <label className="label" htmlFor="email">Email</label>
+            <input id="email" type="email" className="input" placeholder="you@company.com" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" />
           </div>
 
           <div>
             <label className="label" htmlFor="password">Password</label>
-            <input
-              id="password"
-              type="password"
-              className="input"
-              placeholder="Min. 8 characters"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              minLength={8}
-              autoComplete="new-password"
-            />
+            <input id="password" type="password" className="input" placeholder="Min. 8 characters" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={8} autoComplete="new-password" />
           </div>
 
           <button type="submit" className="btn-primary w-full" disabled={loading}>

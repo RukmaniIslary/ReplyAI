@@ -66,8 +66,18 @@ export async function POST(req: NextRequest) {
       }
       conversationId = newConv.id
 
-      // Atomic increment
-      await supabase.rpc('increment_conversations', { user_id: agent.user_id })
+      // Increment usage — non-blocking
+      void (async () => {
+        try {
+          const { error: rpcError } = await supabase.rpc('increment_conversations', { user_id: agent.user_id })
+          if (rpcError) {
+            // Fallback if RPC not yet created in DB
+            await supabase.from('profiles')
+              .update({ conversations_used: (profile?.conversations_used ?? 0) + 1 })
+              .eq('id', agent.user_id)
+          }
+        } catch { /* non-critical */ }
+      })()
     }
 
     // Save user message

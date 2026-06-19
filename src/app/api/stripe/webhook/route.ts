@@ -1,14 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { stripe } from '@/lib/stripe'
-import { createClient } from '@supabase/supabase-js'
+import { createServiceClient } from '@/lib/supabase/service'
 import Stripe from 'stripe'
 
 export const dynamic = 'force-dynamic'
 
-const getSupabase = () => createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+const getSupabase = () => createServiceClient()
 
 const PLAN_LIMITS: Record<string, { conversations: number; agents: number }> = {
   starter: { conversations: 500, agents: 1 },

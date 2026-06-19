@@ -50,7 +50,11 @@ function chunkText(text: string, maxLen = 800): string[] {
 }
 
 async function getEmbedding(model: ReturnType<GoogleGenerativeAI['getGenerativeModel']>, text: string): Promise<number[]> {
-  const result = await model.embedContent(text)
+  const result = await model.embedContent({
+    content: { parts: [{ text }], role: 'user' },
+    taskType: 'RETRIEVAL_DOCUMENT',
+    outputDimensionality: 768,
+  } as Parameters<typeof model.embedContent>[0])
   return result.embedding.values
 }
 
@@ -142,7 +146,7 @@ export async function POST(req: NextRequest) {
       }
 
       const genAI = new GoogleGenerativeAI(apiKey)
-      const embeddingModel = genAI.getGenerativeModel({ model: 'text-embedding-004' })
+      const embeddingModel = genAI.getGenerativeModel({ model: 'gemini-embedding-001' })
 
       // Process in small batches to avoid rate limits
       const BATCH_SIZE = 5

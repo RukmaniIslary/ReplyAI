@@ -27,7 +27,7 @@ export async function GET() {
   // Test Gemini embedding
   try {
     const genAI = new GoogleGenerativeAI(process.env.OPENAI_API_KEY!)
-    const model = genAI.getGenerativeModel({ model: 'text-embedding-004' })
+    const model = genAI.getGenerativeModel({ model: 'gemini-embedding-001' })
     const result = await model.embedContent('test')
     results.gemini_embedding = `OK — ${result.embedding.values.length} dimensions`
   } catch (e) {

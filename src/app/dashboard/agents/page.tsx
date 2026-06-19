@@ -1,18 +1,22 @@
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
-import { Bot, Plus, Code2 } from 'lucide-react'
+import { Bot, Plus, Code2, Settings } from 'lucide-react'
 
 export default async function AgentsPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  const { data: agents } = await supabase.from('agents').select('*').eq('user_id', user!.id).order('created_at', { ascending: false })
+  const { data: agents } = await supabase
+    .from('agents')
+    .select('*')
+    .eq('user_id', user!.id)
+    .order('created_at', { ascending: false })
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-white">Agents</h1>
-          <p className="mt-1 text-sm text-neutral-400">Manage your AI support agents.</p>
+          <p className="mt-1 text-sm text-neutral-400">Create an agent, train it, then paste one line of code on your website.</p>
         </div>
         <Link href="/dashboard/agents/new" className="btn-primary">
           <Plus size={16} />
@@ -21,34 +25,40 @@ export default async function AgentsPage() {
       </div>
 
       {agents && agents.length > 0 ? (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <div className="space-y-4">
           {agents.map((agent) => (
-            <div key={agent.id} className="card flex flex-col gap-4">
-              <div className="flex items-start justify-between">
-                <div className="flex items-center gap-3">
+            <div key={agent.id} className="rounded-xl border border-neutral-800 bg-neutral-950 p-5">
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex items-center gap-3 min-w-0">
                   <div
-                    className="flex h-10 w-10 items-center justify-center rounded-lg"
+                    className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg"
                     style={{ backgroundColor: `${agent.widget_color}20` }}
                   >
                     <Bot size={18} style={{ color: agent.widget_color || '#a3e635' }} />
                   </div>
-                  <div>
-                    <p className="font-medium text-white">{agent.name}</p>
-                    <p className="text-xs text-neutral-500">Created {new Date(agent.created_at).toLocaleDateString()}</p>
+                  <div className="min-w-0">
+                    <p className="font-semibold text-white">{agent.name}</p>
+                    <p className="text-xs text-neutral-500 truncate">{agent.welcome_message}</p>
                   </div>
                 </div>
-                <span className="badge-green">Active</span>
+                <span className="badge-green flex-shrink-0">Active</span>
               </div>
 
-              <p className="text-sm text-neutral-400 line-clamp-2">{agent.welcome_message}</p>
-
-              <div className="flex items-center gap-2">
-                <Link href={`/dashboard/agents/${agent.id}`} className="btn-secondary flex-1 text-center text-xs py-2 px-3">
-                  Configure
+              {/* Action buttons — embed is primary */}
+              <div className="mt-4 flex items-center gap-3">
+                <Link
+                  href={`/dashboard/agents/${agent.id}/embed`}
+                  className="btn-primary flex-1 text-center gap-2 py-2.5"
+                >
+                  <Code2 size={14} />
+                  Get embed code
                 </Link>
-                <Link href={`/dashboard/agents/${agent.id}/embed`} className="btn-ghost text-xs gap-1.5 border border-neutral-800 rounded-lg px-3 py-2">
-                  <Code2 size={12} />
-                  Embed
+                <Link
+                  href={`/dashboard/agents/${agent.id}`}
+                  className="btn-secondary gap-2 py-2.5 px-4"
+                >
+                  <Settings size={14} />
+                  Configure
                 </Link>
               </div>
             </div>
@@ -58,10 +68,12 @@ export default async function AgentsPage() {
         <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-neutral-800 py-20 text-center">
           <Bot size={40} className="mb-4 text-neutral-700" />
           <h2 className="text-lg font-semibold text-white">No agents yet</h2>
-          <p className="mt-1 text-sm text-neutral-500">Create your first AI support agent to get started.</p>
+          <p className="mt-1 text-sm text-neutral-500 max-w-xs">
+            Create your first AI agent, train it on your website, then paste one line of code to go live.
+          </p>
           <Link href="/dashboard/agents/new" className="btn-primary mt-6">
             <Plus size={16} />
-            Create agent
+            Create your first agent
           </Link>
         </div>
       )}

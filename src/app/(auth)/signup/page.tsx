@@ -27,18 +27,24 @@ export default function SignupPage() {
     }
 
     const supabase = createClient()
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
     const { error } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { full_name: name } },
+      options: {
+        data: { full_name: name },
+        emailRedirectTo: `${appUrl}/auth/confirm?next=/dashboard/billing/checkout?plan=starter`,
+      },
     })
 
     if (error) {
       setError(error.message)
       setLoading(false)
     } else {
-      // Redirect to Stripe checkout for trial
-      router.push('/dashboard/billing/checkout?plan=starter')
+      // Show check email message
+      setError('')
+      setLoading(false)
+      router.push('/auth/check-email')
     }
   }
 

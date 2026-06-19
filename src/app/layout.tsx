@@ -39,13 +39,13 @@ export const metadata: Metadata = {
     title: 'Raysef — AI Customer Support Agent. Live in 10 Minutes.',
     description:
       'Train an AI on your website and answer customer questions 24/7 automatically.',
-    images: [{ url: '/og-image.png', width: 1200, height: 630, alt: 'Raysef' }],
+    images: [{ url: '/og-image.svg', width: 1200, height: 630, alt: 'Raysef' }],
   },
   twitter: {
     card: 'summary_large_image',
     title: 'Raysef — AI Customer Support Agent',
     description: 'Train an AI on your website. Answer customer questions 24/7.',
-    images: ['/og-image.png'],
+    images: ['/og-image.svg'],
   },
   robots: {
     index: true,

@@ -1,29 +1,45 @@
+import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export async function updateSession(request: NextRequest) {
-  const { pathname } = request.nextUrl
+  let supabaseResponse = NextResponse.next({ request })
 
-  // Check for Supabase auth token cookie (set by @supabase/ssr on login)
-  const hasSession =
-    request.cookies.has('sb-access-token') ||
-    request.cookies.has('sb-refresh-token') ||
-    // Supabase SSR stores session under this key pattern
-    [...request.cookies.getAll()].some((c) => c.name.startsWith('sb-') && c.name.endsWith('-auth-token'))
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
-  // Protect dashboard routes — no session → redirect to login
-  if (!hasSession && pathname.startsWith('/dashboard')) {
+  if (!supabaseUrl || !supabaseAnonKey) {
+    if (request.nextUrl.pathname.startsWith('/dashboard')) {
+      return NextResponse.redirect(new URL('/login', request.url))
+    }
+    return supabaseResponse
+  }
+
+  const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
+    cookies: {
+      getAll() { return request.cookies.getAll() },
+      setAll(cookiesToSet) {
+        cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
+        supabaseResponse = NextResponse.next({ request })
+        cookiesToSet.forEach(({ name, value, options }) =>
+          supabaseResponse.cookies.set(name, value, options)
+        )
+      },
+    },
+  })
+
+  // Always use getUser() — validates the token server-side, not just cookie existence
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user && request.nextUrl.pathname.startsWith('/dashboard')) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
-    url.searchParams.set('next', pathname)
+    url.searchParams.set('next', request.nextUrl.pathname)
     return NextResponse.redirect(url)
   }
 
-  // Redirect logged-in users away from auth pages
-  if (hasSession && (pathname === '/login' || pathname === '/signup')) {
-    const url = request.nextUrl.clone()
-    url.pathname = '/dashboard'
-    return NextResponse.redirect(url)
+  if (user && (request.nextUrl.pathname === '/login' || request.nextUrl.pathname === '/signup')) {
+    return NextResponse.redirect(new URL('/dashboard', request.url))
   }
 
-  return NextResponse.next({ request })
+  return supabaseResponse
 }

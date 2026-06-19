@@ -29,7 +29,11 @@ export default function NewAgentPage() {
 
     const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
+    if (!user) {
+      setError('Session expired. Please sign in again.')
+      setLoading(false)
+      return
+    }
 
     const { data, error } = await supabase.from('agents').insert({
       user_id: user.id,

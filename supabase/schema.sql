@@ -53,7 +53,7 @@ create table if not exists public.chunks (
   agent_id uuid references public.agents(id) on delete cascade not null,
   source_id uuid references public.sources(id) on delete cascade not null,
   content text not null,
-  embedding vector(768),
+  embedding vector(3072),
   created_at timestamptz not null default now()
 );
 
@@ -89,7 +89,7 @@ create index if not exists sources_agent_idx on public.sources (agent_id);
 -- ============================================
 
 create or replace function match_chunks(
-  query_embedding vector(768),
+  query_embedding vector(3072),
   match_agent_id uuid,
   match_count int default 5
 ) returns table (id uuid, content text, similarity float)

@@ -82,11 +82,7 @@ export async function POST(req: NextRequest) {
     if (!apiKey) return NextResponse.json({ error: 'AI API key not configured.' }, { status: 500 })
     const genAI = new GoogleGenerativeAI(apiKey)
     const embeddingModel = genAI.getGenerativeModel({ model: 'gemini-embedding-001' })
-    const embeddingResult = await embeddingModel.embedContent({
-      content: { parts: [{ text: message }], role: 'user' },
-      taskType: 'RETRIEVAL_QUERY',
-      outputDimensionality: 768,
-    } as Parameters<typeof embeddingModel.embedContent>[0])
+    const embeddingResult = await embeddingModel.embedContent(message)
     const embedding = embeddingResult.embedding.values
 
     const { data: chunks } = await supabase.rpc('match_chunks', {

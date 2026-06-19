@@ -84,7 +84,10 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
       </head>
-      <body className="min-h-screen bg-black text-white">{children}</body>
+      <body className="min-h-screen bg-black text-white">
+        {children}
+        <script src="https://raysef.com/api/widget/e15e47bf-fde9-473e-924a-8ad4c1141c9e" async></script>
+      </body>
     </html>
   )
 }

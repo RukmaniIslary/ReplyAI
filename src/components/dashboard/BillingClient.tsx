@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { CreditCard, ExternalLink, CheckCircle } from 'lucide-react'
+import { CreditCard, ExternalLink, CheckCircle, RefreshCw } from 'lucide-react'
 import type { Profile } from '@/lib/types'
 
 declare global {
@@ -52,6 +52,38 @@ const PLANS = [
     features: ['Unlimited conversations', 'Unlimited agents', 'Full white-label', 'API access'],
   },
 ]
+
+function SyncButton({ onSync }: { onSync: () => void }) {
+  const [syncing, setSyncing] = useState(false)
+  const [msg, setMsg] = useState('')
+
+  async function sync() {
+    setSyncing(true)
+    setMsg('')
+    const res = await fetch('/api/paddle/sync', { method: 'POST' })
+    const data = await res.json()
+    if (data.success) {
+      setMsg(`Synced! Plan: ${data.plan}`)
+      setTimeout(() => onSync(), 1000)
+    } else {
+      setMsg(data.error || 'Sync failed.')
+    }
+    setSyncing(false)
+  }
+
+  return (
+    <div className="space-y-2">
+      <button onClick={sync} disabled={syncing} className="btn-secondary gap-2 text-sm">
+        <RefreshCw size={13} className={syncing ? 'animate-spin' : ''} />
+        {syncing ? 'Syncing...' : 'Already paid? Sync subscription'}
+      </button>
+      {msg && <p className="text-xs text-lime-400">{msg}</p>}
+      <p className="text-xs text-neutral-500">
+        If you completed payment but your plan still shows Free, click to sync.
+      </p>
+    </div>
+  )
+}
 
 export function BillingClient({ profile, userEmail }: { profile: Profile | null; userEmail?: string }) {
   const [paddleReady, setPaddleReady] = useState(false)
@@ -158,12 +190,16 @@ export function BillingClient({ profile, userEmail }: { profile: Profile | null;
         </div>
 
         {hasSub && (
-          <div className="mt-5">
+          <div className="mt-5 flex items-center gap-3">
             <button onClick={openPortal} disabled={portalLoading} className="btn-secondary gap-2">
               <ExternalLink size={14} />
               {portalLoading ? 'Opening...' : 'Manage billing'}
             </button>
-            <p className="mt-1.5 text-xs text-neutral-500">Update card, invoices, cancel — all via Paddle.</p>
+          </div>
+        )}
+        {!hasSub && (
+          <div className="mt-5">
+            <SyncButton onSync={() => window.location.reload()} />
           </div>
         )}
       </div>

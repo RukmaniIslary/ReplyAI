@@ -104,7 +104,7 @@ export async function POST(req: NextRequest) {
     const genAI = new GoogleGenerativeAI(apiKey)
 
     // Embed query for vector search
-    const embeddingModel = genAI.getGenerativeModel({ model: 'gemini-embedding-001' })
+    const embeddingModel = genAI.getGenerativeModel({ model: 'text-embedding-004' })
     const embeddingResult = await embeddingModel.embedContent({
       content: { parts: [{ text: message }], role: 'user' },
       outputDimensionality: 768,
@@ -120,7 +120,7 @@ export async function POST(req: NextRequest) {
     const context = chunks?.map((c: { content: string }) => c.content).join('\n\n') || ''
 
     // Generate response
-    const chatModel = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' })
+    const chatModel = genAI.getGenerativeModel({ model: 'gemini-1.5-flash-latest' })
 
     const systemPrompt = `${agent.system_prompt}
 

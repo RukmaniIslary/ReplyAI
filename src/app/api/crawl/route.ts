@@ -145,7 +145,7 @@ export async function POST(req: NextRequest) {
       }
 
       const genAI = new GoogleGenerativeAI(apiKey)
-      const embeddingModel = genAI.getGenerativeModel({ model: 'gemini-embedding-001' })
+      const embeddingModel = genAI.getGenerativeModel({ model: 'text-embedding-004' })
 
       // Process in small batches to avoid rate limits
       const BATCH_SIZE = 5

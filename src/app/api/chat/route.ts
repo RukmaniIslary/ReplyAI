@@ -159,6 +159,7 @@ Rules:
     return NextResponse.json({ reply, conversationId }, { headers: CORS })
   } catch (err) {
     console.error('Chat error:', err)
-    return NextResponse.json({ error: 'Something went wrong.' }, { status: 500, headers: CORS })
+    const msg = err instanceof Error ? err.message : String(err)
+    return NextResponse.json({ error: msg }, { status: 500, headers: CORS })
   }
 }

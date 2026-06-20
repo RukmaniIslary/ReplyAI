@@ -30,7 +30,7 @@ export async function GET(
     })
   }
 
-  const appUrl = (process.env.NEXT_PUBLIC_APP_URL || 'https://raysef.com').replace(/\/$/, '')
+  const appUrl = (process.env.NEXT_PUBLIC_APP_URL || 'https://raysef.com').replace(/\/+$/, '')
 
   // Use JSON.stringify for safe JS string injection — prevents XSS
   const agentId = JSON.stringify(agent.id)
@@ -158,6 +158,7 @@ export async function GET(
     try {
       var res = await fetch(APP_URL + '/api/chat', {
         method: 'POST',
+        redirect: 'follow',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ agentId: AGENT_ID, sessionId: sessionId, message: text, pageUrl: window.location.href }),
       });

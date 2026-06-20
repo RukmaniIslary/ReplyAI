@@ -120,7 +120,7 @@ export async function POST(req: NextRequest) {
     const context = chunks?.map((c: { content: string }) => c.content).join('\n\n') || ''
 
     // Generate response
-    const chatModel = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' })
+    const chatModel = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' })
 
     const systemPrompt = `${agent.system_prompt}
 

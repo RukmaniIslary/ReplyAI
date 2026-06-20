@@ -93,11 +93,8 @@ export async function POST(req: NextRequest) {
     if (geminiKey) {
       try {
         const genAI = new GoogleGenerativeAI(geminiKey)
-        const embeddingModel = genAI.getGenerativeModel({ model: 'text-embedding-004' })
-        const embeddingResult = await embeddingModel.embedContent({
-          content: { parts: [{ text: message }], role: 'user' },
-          outputDimensionality: 768,
-        } as Parameters<typeof embeddingModel.embedContent>[0])
+        const embeddingModel = genAI.getGenerativeModel({ model: 'embedding-001' })
+        const embeddingResult = await embeddingModel.embedContent(message)
         const embedding = embeddingResult.embedding.values
 
         const { data: chunks } = await supabase.rpc('match_chunks', {

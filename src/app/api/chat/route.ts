@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { GoogleGenerativeAI } from '@google/generative-ai'
+import Groq from 'groq-sdk'
 
 export const dynamic = 'force-dynamic'
 
-// CORS headers — required for cross-domain widget requests
 const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
@@ -71,7 +71,6 @@ export async function POST(req: NextRequest) {
         try {
           const { error: rpcError } = await supabase.rpc('increment_conversations', { user_id: agent.user_id })
           if (rpcError) {
-            // Fallback if RPC not yet created in DB
             await supabase.from('profiles')
               .update({ conversations_used: (profile?.conversations_used ?? 0) + 1 })
               .eq('id', agent.user_id)
@@ -87,45 +86,50 @@ export async function POST(req: NextRequest) {
       content: message,
     })
 
-    // Get recent messages BEFORE the one we just inserted for context
+    // Embed query using Gemini (for vector search)
+    const geminiKey = process.env.OPENAI_API_KEY || process.env.GEMINI_API_KEY
+    let context = ''
+
+    if (geminiKey) {
+      try {
+        const genAI = new GoogleGenerativeAI(geminiKey)
+        const embeddingModel = genAI.getGenerativeModel({ model: 'text-embedding-004' })
+        const embeddingResult = await embeddingModel.embedContent({
+          content: { parts: [{ text: message }], role: 'user' },
+          outputDimensionality: 768,
+        } as Parameters<typeof embeddingModel.embedContent>[0])
+        const embedding = embeddingResult.embedding.values
+
+        const { data: chunks } = await supabase.rpc('match_chunks', {
+          query_embedding: embedding,
+          match_agent_id: agentId,
+          match_count: 5,
+        })
+        context = chunks?.map((c: { content: string }) => c.content).join('\n\n') || ''
+      } catch {
+        // Embedding failed — continue without context
+      }
+    }
+
+    // Get recent messages for chat history
     const { data: recentMessages } = await supabase
       .from('messages').select('role, content')
       .eq('conversation_id', conversationId)
       .order('created_at', { ascending: false })
       .limit(11)
 
-    const history = (recentMessages || []).reverse().slice(0, -1) // exclude just-inserted message
+    const history = (recentMessages || []).reverse().slice(0, -1)
 
-    // Initialize Gemini
-    const apiKey = process.env.GEMINI_API_KEY || process.env.OPENAI_API_KEY
-    if (!apiKey) {
-      return NextResponse.json({ error: 'AI not configured.' }, { status: 500, headers: CORS })
-    }
-    const genAI = new GoogleGenerativeAI(apiKey)
+    // Generate response using Groq (free, fast)
+    const groqKey = process.env.GROQ_API_KEY
+    let reply = ''
 
-    // Embed query for vector search
-    const embeddingModel = genAI.getGenerativeModel({ model: 'text-embedding-004' })
-    const embeddingResult = await embeddingModel.embedContent({
-      content: { parts: [{ text: message }], role: 'user' },
-      outputDimensionality: 768,
-    } as Parameters<typeof embeddingModel.embedContent>[0])
-    const embedding = embeddingResult.embedding.values
+    if (groqKey) {
+      const groq = new Groq({ apiKey: groqKey })
 
-    const { data: chunks } = await supabase.rpc('match_chunks', {
-      query_embedding: embedding,
-      match_agent_id: agentId,
-      match_count: 5,
-    })
+      const systemPrompt = `${agent.system_prompt}
 
-    const context = chunks?.map((c: { content: string }) => c.content).join('\n\n') || ''
-
-    // Generate response
-    const chatModel = genAI.getGenerativeModel({ model: 'gemini-1.5-flash-latest' })
-
-    const systemPrompt = `${agent.system_prompt}
-
-Knowledge base:
-${context || 'No specific context found. Be honest and offer to escalate if unsure.'}
+${context ? `Knowledge base:\n${context}` : 'No knowledge base loaded yet.'}
 
 Rules:
 - Answer only from the knowledge base above.
@@ -133,21 +137,45 @@ Rules:
 - Keep answers short and helpful.
 - Never make up information.`
 
-    const chatHistory = history.map((m: { role: string; content: string }) => ({
-      role: m.role === 'assistant' ? 'model' : 'user',
-      parts: [{ text: m.content }],
-    }))
+      const messages: Groq.Chat.ChatCompletionMessageParam[] = [
+        { role: 'system', content: systemPrompt },
+        ...history.map((m: { role: string; content: string }) => ({
+          role: m.role === 'assistant' ? 'assistant' as const : 'user' as const,
+          content: m.content,
+        })),
+        { role: 'user', content: message },
+      ]
 
-    const chat = chatModel.startChat({
-      history: [
-        { role: 'user', parts: [{ text: systemPrompt }] },
-        { role: 'model', parts: [{ text: 'Understood. I will answer based on the knowledge base only.' }] },
-        ...chatHistory,
-      ],
-    })
+      const completion = await groq.chat.completions.create({
+        model: 'llama-3.1-8b-instant',
+        messages,
+        max_tokens: 500,
+        temperature: 0.3,
+      })
 
-    const result = await chat.sendMessage(message)
-    const reply = result.response.text()
+      reply = completion.choices[0]?.message?.content || 'Sorry, I could not generate a response.'
+
+    } else if (geminiKey) {
+      // Fallback to Gemini if no Groq key
+      const genAI = new GoogleGenerativeAI(geminiKey)
+      const chatModel = genAI.getGenerativeModel({ model: 'gemini-1.5-flash-latest' })
+
+      const chat = chatModel.startChat({
+        history: [
+          { role: 'user', parts: [{ text: `${agent.system_prompt}\n\nKnowledge base:\n${context}` }] },
+          { role: 'model', parts: [{ text: 'Understood.' }] },
+          ...history.map((m: { role: string; content: string }) => ({
+            role: m.role === 'assistant' ? 'model' : 'user',
+            parts: [{ text: m.content }],
+          })),
+        ],
+      })
+      const result = await chat.sendMessage(message)
+      reply = result.response.text()
+
+    } else {
+      return NextResponse.json({ error: 'No AI API key configured.' }, { status: 500, headers: CORS })
+    }
 
     // Save assistant reply
     await supabase.from('messages').insert({

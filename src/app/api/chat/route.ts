@@ -105,7 +105,10 @@ export async function POST(req: NextRequest) {
 
     // Embed query for vector search
     const embeddingModel = genAI.getGenerativeModel({ model: 'gemini-embedding-001' })
-    const embeddingResult = await embeddingModel.embedContent(message)
+    const embeddingResult = await embeddingModel.embedContent({
+      content: { parts: [{ text: message }], role: 'user' },
+      outputDimensionality: 768,
+    } as Parameters<typeof embeddingModel.embedContent>[0])
     const embedding = embeddingResult.embedding.values
 
     const { data: chunks } = await supabase.rpc('match_chunks', {

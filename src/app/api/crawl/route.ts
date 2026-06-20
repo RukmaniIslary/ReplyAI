@@ -50,7 +50,10 @@ function chunkText(text: string, maxLen = 800): string[] {
 }
 
 async function getEmbedding(model: ReturnType<GoogleGenerativeAI['getGenerativeModel']>, text: string): Promise<number[]> {
-  const result = await model.embedContent(text)
+  const result = await model.embedContent({
+    content: { parts: [{ text }], role: 'user' },
+    outputDimensionality: 768,
+  } as Parameters<typeof model.embedContent>[0])
   return result.embedding.values
 }
 

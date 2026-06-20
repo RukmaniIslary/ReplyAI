@@ -28,7 +28,10 @@ export async function GET() {
   try {
     const genAI = new GoogleGenerativeAI(process.env.OPENAI_API_KEY!)
     const model = genAI.getGenerativeModel({ model: 'gemini-embedding-001' })
-    const result = await model.embedContent('test')
+    const result = await model.embedContent({
+      content: { parts: [{ text: 'test' }], role: 'user' },
+      outputDimensionality: 768,
+    } as Parameters<typeof model.embedContent>[0])
     results.gemini_embedding = `OK — ${result.embedding.values.length} dimensions`
   } catch (e) {
     results.gemini_embedding = `ERROR: ${e instanceof Error ? e.message : String(e)}`

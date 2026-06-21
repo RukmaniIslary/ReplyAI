@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
-import { GoogleGenerativeAI } from '@google/generative-ai'
 import Groq from 'groq-sdk'
 
 export const dynamic = 'force-dynamic'
@@ -15,6 +14,26 @@ export async function OPTIONS() {
   return new NextResponse(null, { status: 204, headers: CORS })
 }
 
+// Simple keyword search — no embeddings needed
+function findRelevantChunks(chunks: { content: string }[], query: string, limit = 5): string[] {
+  const words = query.toLowerCase().split(/\s+/).filter(w => w.length > 2)
+  
+  const scored = chunks.map(chunk => {
+    const text = chunk.content.toLowerCase()
+    const score = words.reduce((acc, word) => {
+      const count = (text.match(new RegExp(word, 'g')) || []).length
+      return acc + count
+    }, 0)
+    return { content: chunk.content, score }
+  })
+
+  return scored
+    .sort((a, b) => b.score - a.score)
+    .slice(0, limit)
+    .filter(c => c.score > 0)
+    .map(c => c.content)
+}
+
 export async function POST(req: NextRequest) {
   try {
     const supabase = createServiceClient()
@@ -24,7 +43,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing required fields.' }, { status: 400, headers: CORS })
     }
 
-    // Load agent
     const { data: agent, error: agentError } = await supabase
       .from('agents').select('*').eq('id', agentId).single()
 
@@ -36,14 +54,13 @@ export async function POST(req: NextRequest) {
     const { data: profile } = await supabase
       .from('profiles')
       .select('conversations_used, conversations_limit, plan')
-      .eq('id', agent.user_id)
-      .single()
+      .eq('id', agent.user_id).single()
 
     if (profile && profile.conversations_limit !== -1 && profile.conversations_limit > 0 &&
         profile.conversations_used >= profile.conversations_limit) {
       const fallback = agent.escalation_email
-        ? `I've reached my conversation limit. Please email ${agent.escalation_email} for help.`
-        : "I've reached my conversation limit. Please check back soon."
+        ? `Conversation limit reached. Please email ${agent.escalation_email}.`
+        : "Conversation limit reached. Please check back soon."
       return NextResponse.json({ reply: fallback }, { headers: CORS })
     }
 
@@ -66,7 +83,6 @@ export async function POST(req: NextRequest) {
       }
       conversationId = newConv.id
 
-      // Increment usage — non-blocking
       void (async () => {
         try {
           const { error: rpcError } = await supabase.rpc('increment_conversations', { user_id: agent.user_id })
@@ -86,29 +102,16 @@ export async function POST(req: NextRequest) {
       content: message,
     })
 
-    // Embed query using Gemini (for vector search)
-    const geminiKey = process.env.OPENAI_API_KEY || process.env.GEMINI_API_KEY
-    let context = ''
+    // Get all chunks for this agent and do keyword search
+    const { data: allChunks } = await supabase
+      .from('chunks')
+      .select('content')
+      .eq('agent_id', agentId)
 
-    if (geminiKey) {
-      try {
-        const genAI = new GoogleGenerativeAI(geminiKey)
-        const embeddingModel = genAI.getGenerativeModel({ model: 'embedding-001' })
-        const embeddingResult = await embeddingModel.embedContent(message)
-        const embedding = embeddingResult.embedding.values
+    const relevantChunks = findRelevantChunks(allChunks || [], message)
+    const context = relevantChunks.join('\n\n')
 
-        const { data: chunks } = await supabase.rpc('match_chunks', {
-          query_embedding: embedding,
-          match_agent_id: agentId,
-          match_count: 5,
-        })
-        context = chunks?.map((c: { content: string }) => c.content).join('\n\n') || ''
-      } catch {
-        // Embedding failed — continue without context
-      }
-    }
-
-    // Get recent messages for chat history
+    // Get recent chat history
     const { data: recentMessages } = await supabase
       .from('messages').select('role, content')
       .eq('conversation_id', conversationId)
@@ -117,64 +120,43 @@ export async function POST(req: NextRequest) {
 
     const history = (recentMessages || []).reverse().slice(0, -1)
 
-    // Generate response using Groq (free, fast)
+    // Generate response with Groq
     const groqKey = process.env.GROQ_API_KEY
-    let reply = ''
+    if (!groqKey) {
+      return NextResponse.json({ error: 'AI not configured.' }, { status: 500, headers: CORS })
+    }
 
-    if (groqKey) {
-      const groq = new Groq({ apiKey: groqKey })
+    const groq = new Groq({ apiKey: groqKey })
 
-      const systemPrompt = `${agent.system_prompt}
+    const systemPrompt = `${agent.system_prompt}
 
-${context ? `Knowledge base:\n${context}` : 'No knowledge base loaded yet.'}
+${context ? `Knowledge base:\n${context}` : 'No knowledge base loaded yet. Ask the user to set up training data.'}
 
 Rules:
 - Answer only from the knowledge base above.
-- If not in context, say you do not have that info and offer to escalate.
-- Keep answers short and helpful.
+- If the answer is not in the knowledge base, say you do not have that info and offer to escalate.
+- Keep answers short, clear and helpful.
 - Never make up information.`
 
-      const messages: Groq.Chat.ChatCompletionMessageParam[] = [
-        { role: 'system', content: systemPrompt },
-        ...history.map((m: { role: string; content: string }) => ({
-          role: m.role === 'assistant' ? 'assistant' as const : 'user' as const,
-          content: m.content,
-        })),
-        { role: 'user', content: message },
-      ]
+    const messages: Groq.Chat.ChatCompletionMessageParam[] = [
+      { role: 'system', content: systemPrompt },
+      ...history.map((m: { role: string; content: string }) => ({
+        role: m.role === 'assistant' ? 'assistant' as const : 'user' as const,
+        content: m.content,
+      })),
+      { role: 'user', content: message },
+    ]
 
-      const completion = await groq.chat.completions.create({
-        model: 'llama-3.1-8b-instant',
-        messages,
-        max_tokens: 500,
-        temperature: 0.3,
-      })
+    const completion = await groq.chat.completions.create({
+      model: 'llama-3.1-8b-instant',
+      messages,
+      max_tokens: 500,
+      temperature: 0.3,
+    })
 
-      reply = completion.choices[0]?.message?.content || 'Sorry, I could not generate a response.'
+    const reply = completion.choices[0]?.message?.content || 'Sorry, I could not generate a response.'
 
-    } else if (geminiKey) {
-      // Fallback to Gemini if no Groq key
-      const genAI = new GoogleGenerativeAI(geminiKey)
-      const chatModel = genAI.getGenerativeModel({ model: 'gemini-1.5-flash-latest' })
-
-      const chat = chatModel.startChat({
-        history: [
-          { role: 'user', parts: [{ text: `${agent.system_prompt}\n\nKnowledge base:\n${context}` }] },
-          { role: 'model', parts: [{ text: 'Understood.' }] },
-          ...history.map((m: { role: string; content: string }) => ({
-            role: m.role === 'assistant' ? 'model' : 'user',
-            parts: [{ text: m.content }],
-          })),
-        ],
-      })
-      const result = await chat.sendMessage(message)
-      reply = result.response.text()
-
-    } else {
-      return NextResponse.json({ error: 'No AI API key configured.' }, { status: 500, headers: CORS })
-    }
-
-    // Save assistant reply
+    // Save reply
     await supabase.from('messages').insert({
       conversation_id: conversationId,
       role: 'assistant',
